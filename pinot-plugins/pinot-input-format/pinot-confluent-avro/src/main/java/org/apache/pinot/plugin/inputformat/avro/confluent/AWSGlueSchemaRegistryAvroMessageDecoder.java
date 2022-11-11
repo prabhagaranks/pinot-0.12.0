@@ -20,16 +20,15 @@ package org.apache.pinot.plugin.inputformat.avro.confluent;
 
 import com.amazonaws.services.schemaregistry.deserializers.GlueSchemaRegistryKafkaDeserializer;
 import com.google.common.base.Preconditions;
+import java.util.Arrays;
+import java.util.Map;
+import java.util.Set;
 import org.apache.avro.generic.GenericData;
 import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractor;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
-
-import java.util.Arrays;
-import java.util.Map;
-import java.util.Set;
 
 
 /**

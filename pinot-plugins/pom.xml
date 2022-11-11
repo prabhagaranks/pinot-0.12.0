@@ -83,7 +83,7 @@
       <activation>
         <property>
           <name>skipShade</name>
-          <value>!true</value>
+          <value>true</value>
         </property>
       </activation>
       <build>
@@ -124,7 +124,7 @@
                     </relocation>
                     <relocation>
                       <pattern>software.amazon</pattern>
-                      <shadedPattern>${shade.prefix}.software.amazon</shadedPattern>
+                      <shadedPattern>${shade.prefix}.pinelabs.software.amazon</shadedPattern>
                     </relocation>
                     <relocation>
                       <pattern>org.reflections</pattern>

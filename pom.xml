@@ -49,15 +49,12 @@
     <module>pinot-minion</module>
     <module>pinot-plugins</module>
     <module>pinot-tools</module>
-    <module>pinot-perf</module>
     <module>pinot-integration-test-base</module>
-    <module>pinot-integration-tests</module>
     <module>pinot-distribution</module>
     <module>pinot-connectors</module>
     <module>pinot-segment-local</module>
     <module>pinot-compatibility-verifier</module>
     <module>contrib/pinot-fmpp-maven-plugin</module>
-
     <module>pinot-query-planner</module>
     <module>pinot-query-runtime</module>
   </modules>
