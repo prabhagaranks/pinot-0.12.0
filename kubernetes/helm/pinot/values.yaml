@@ -26,6 +26,12 @@ image:
 
 cluster:
   name: pinot-quickstart
+  extra:
+    configs: |-
+      pinot.multistage.engine.enabled=true
+      pinot.server.instance.currentDataTableVersion=4
+      pinot.query.server.port=8421
+      pinot.query.runner.port=8442
 
 imagePullSecrets: []
 
