@@ -1,0 +1,58 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    alb.ingress.kubernetes.io/actions.ssl-redirect: '{"Type": "redirect", "RedirectConfig":
+      { "Protocol": "HTTPS", "Port": "443", "StatusCode": "HTTP_301"}}'
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80},{"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/scheme: internal
+    alb.ingress.kubernetes.io/shield-advanced-protection: "false"
+    alb.ingress.kubernetes.io/success-codes: 200,404,301,302
+    kubernetes.io/ingress.class: alb
+    meta.helm.sh/release-name: pinot
+    meta.helm.sh/release-namespace: pinot-system
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_clear_input_headers "Host" "X-Forwarded-Host";
+      proxy_set_header Host $http_host;
+      proxy_set_header X-Forwarded-Host $http_x_forwarded_host;
+    nginx.ingress.kubernetes.io/from-to-www-redirect: "true"
+    alb.ingress.kubernetes.io/group.name: pinot
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: http
+    service.beta.kubernetes.io/aws-load-balancer-ssl-cert: "arn:aws:acm:ap-south-1:935849191916:certificate/c3dd510d-3d2c-4a22-8e83-8f6d3b735dfb,arn:aws:acm:ap-south-1:935849191916:certificate/31677f52-dfe1-4fd2-bac4-8f7470f7884b"
+    service.beta.kubernetes.io/aws-load-balancer-ssl-ports: "443"
+    service.beta.kubernetes.io/aws-load-balancer-type: alb
+  labels:
+    app: pinot
+    app.kubernetes.io/managed-by: Helm
+    chart: pinot-0.12.0
+    heritage: Helm
+    release: pinot
+  name: pinot
+  namespace: pinot-system
+spec:
+  rules:
+  - host: cdlpinot-controller.pinelabs.com
+    http:
+      paths:
+      - backend:
+          service:
+            name: pinot-controller
+            port:
+              number: 9000
+        path: /
+        pathType: Prefix
+  - host: cdlpinot-broker.pinelabs.com
+    http:
+      paths:
+      - backend:
+          service:
+            name: pinot-broker
+            port:
+              number: 8099
+        path: /
+        pathType: Prefix
+  tls:
+  - hosts:
+    - cdlpinot-broker.pinelabs.com
+    - cdlpinot-controller.pinelabs.com
+
