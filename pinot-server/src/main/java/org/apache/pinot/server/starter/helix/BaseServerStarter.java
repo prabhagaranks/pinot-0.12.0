@@ -53,7 +53,6 @@ import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.common.request.context.ThreadTimer;
 import org.apache.pinot.common.restlet.resources.SystemResourceInfo;
 import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
@@ -71,11 +70,13 @@ import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshState;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.server.access.AccessControlFactory;
+import org.apache.pinot.server.api.AdminApiApplication;
 import org.apache.pinot.server.conf.ServerConf;
 import org.apache.pinot.server.realtime.ControllerLeaderLocator;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.server.starter.ServerQueriesDisabledTracker;
+import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.environmentprovider.PinotEnvironmentProvider;
@@ -176,9 +177,13 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _pinotEnvironmentProvider = initializePinotEnvironmentProvider();
 
     // Enable/disable thread CPU time measurement through instance config.
-    ThreadTimer.setThreadCpuTimeMeasurementEnabled(
+    ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(
         _serverConf.getProperty(Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT,
             Server.DEFAULT_ENABLE_THREAD_CPU_TIME_MEASUREMENT));
+    // Enable/disable thread memory allocation tracking through instance config
+    ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(
+        _serverConf.getProperty(Server.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT,
+        Server.DEFAULT_THREAD_ALLOCATED_BYTES_MEASUREMENT));
 
     // Set data table version send to broker.
     int dataTableVersion =
@@ -610,7 +615,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
     } catch (IOException e) {
       LOGGER.warn("Caught exception closing PinotFS classes", e);
     }
-    _adminApiApplication.stop();
+    _adminApiApplication.startShuttingDown();
     _helixAdmin.setConfig(_instanceConfigScope,
         Collections.singletonMap(Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.toString(true)));
 
@@ -630,6 +635,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _realtimeLuceneIndexRefreshState.stop();
     LOGGER.info("Deregistering service status handler");
     ServiceStatus.removeServiceStatusCallback(_instanceId);
+    _adminApiApplication.stop();
     LOGGER.info("Finish shutting down Pinot server for {}", _instanceId);
   }
 

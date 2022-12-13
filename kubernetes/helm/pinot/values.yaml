@@ -21,17 +21,11 @@
 
 image:
   repository: apachepinot/pinot
-  tag: latest # release-0.10.0
+  tag: latest # release-0.11.0
   pullPolicy: Always # Use IfNotPresent when you pinged a version of image tag
 
 cluster:
   name: pinot-quickstart
-  extra:
-    configs: |-
-      pinot.multistage.engine.enabled=true
-      pinot.server.instance.currentDataTableVersion=4
-      pinot.query.server.port=8421
-      pinot.query.runner.port=8442
 
 imagePullSecrets: []
 
@@ -60,15 +54,17 @@ serviceAccount:
 
 additionalMatchLabels: {}
 
+
 pinotAuth:
-  enabled: true
+  enabled: false
   controllerFactoryClass: org.apache.pinot.controller.api.access.BasicAuthAccessControlFactory
   brokerFactoryClass: org.apache.pinot.broker.broker.BasicAuthAccessControlFactory
   configs:
-    - access.control.principals=admin,user
-    - access.control.principals.admin.password=verysecret
-    - access.control.principals.user.password=secret
-    - access.control.principals.user.permissions=READ
+  #  - access.control.principals=admin,user
+  #  - access.control.principals.admin.password=verysecret
+  #  - access.control.principals.user.password=secret
+  #  - access.control.principals.user.tables=baseballStats,otherstuff
+  #  - access.control.principals.user.permissions=READ
 
 # ------------------------------------------------------------------------------
 # Pinot Controller:
@@ -114,19 +110,17 @@ controller:
     externalIPs: []
     loadBalancerIP: ""
     loadBalancerSourceRanges: []
-    type: NodePort
+    type: ClusterIP
     port: 9000
     nodePort: ""
     protocol: TCP
     name: controller
 
   external:
-    enabled: false
+    enabled: true
     type: LoadBalancer
     port: 9000
-    annotations: 
-          service.beta.kubernetes.io/aws-load-balancer-internal: "false"
-          service.beta.kubernetes.io/aws-load-balancer-name: "pinot-controller"
+    annotations: {}
 
   ingress:
     v1beta1:
@@ -137,6 +131,11 @@ controller:
       hosts: [ ]
     v1:
       enabled: false
+      ingressClassName: ""
+      annotations: {}
+      tls: []
+      path: /
+      hosts: []
 
   resources:
     requests:
@@ -174,24 +173,7 @@ controller:
   extra:
     configs: |-
       pinot.set.instance.id.to.hostname=true
-      pinot.broker.timeoutMs=120000
       controller.task.scheduler.enabled=true
-      controller.task.frequencyInSeconds=3600
-      #controller.access.protocols=https
-      #controller.access.protocols.https.port=9443
-      #controller.broker.protocol=https
-      #controller.vip.protocol=https
-      #controller.vip.port=9443
-      controller.admin.access.control.factory.class=org.apache.pinot.controller.api.access.BasicAuthAccessControlFactory
-      controller.admin.access.control.principals=admin,user
-      controller.admin.access.control.principals.admin.password=verysecret
-      controller.admin.access.control.principals.user.password=secret
-      controller.segment.fetcher.auth.token=Basic YWRtaW46dmVyeXNlY3JldA==
-      controller.enable.split.commit=true
-      pinot.controller.storage.factory.class.s3=org.apache.pinot.plugin.filesystem.S3PinotFS
-      pinot.controller.storage.factory.s3.region=ap-south-1
-      pinot.controller.segment.fetcher.protocols=file,http,s3
-      pinot.controller.segment.fetcher.s3.class=org.apache.pinot.common.utils.fetcher.PinotFSSegmentFetcher
 
 # ------------------------------------------------------------------------------
 # Pinot Broker:
@@ -204,7 +186,7 @@ broker:
     # fsGroup: 2000
   securityContext: {}
 
-  jvmOpts: "-XX:ActiveProcessorCount=2 -Xms1G -Xmx4G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-broker.log"
+  jvmOpts: "-XX:ActiveProcessorCount=2 -Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-broker.log"
 
   log4j2ConfFile: /opt/pinot/conf/log4j2.xml
   pluginsDir: /opt/pinot/plugins
@@ -227,20 +209,18 @@ broker:
     externalIPs: []
     loadBalancerIP: ""
     loadBalancerSourceRanges: []
-    type: NodePort
+    type: ClusterIP
     protocol: TCP
     port: 8099
     name: broker
     nodePort: ""
 
   external:
-    enabled: false
+    enabled: true
     type: LoadBalancer
     port: 8099
     # For example, in private GKE cluster, you might add cloud.google.com/load-balancer-type: Internal
-    annotations:
-          service.beta.kubernetes.io/aws-load-balancer-internal: "false"
-          service.beta.kubernetes.io/aws-load-balancer-name: pinot-broker
+    annotations: {}
 
   ingress:
     v1beta1:
@@ -251,6 +231,11 @@ broker:
       hosts: []
     v1:
       enabled: false
+      ingressClassName: ""
+      annotations: {}
+      tls: []
+      path: /
+      hosts: []
 
   resources:
     requests:
@@ -288,14 +273,6 @@ broker:
   extra:
     configs: |-
       pinot.set.instance.id.to.hostname=true
-      #pinot.broker.client.access.protocols=https
-      #pinot.broker.client.access.protocols.https.port=8443
-      #pinot.broker.nettytls.enabled=true
-      pinot.broker.access.control.class=org.apache.pinot.broker.broker.BasicAuthAccessControlFactory
-      pinot.broker.access.control.principals=admin,user
-      pinot.broker.access.control.principals.admin.password=verysecret 
-      pinot.broker.access.control.principals.user.password=secret
-
 
 # ------------------------------------------------------------------------------
 # Pinot Server:
@@ -326,7 +303,7 @@ server:
     extraVolumes: []
     extraVolumeMounts: []
 
-  jvmOpts: "-Xms1G -Xmx4G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-server.log"
+  jvmOpts: "-Xms512M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-server.log"
 
   log4j2ConfFile: /opt/pinot/conf/log4j2.xml
   pluginsDir: /opt/pinot/plugins
@@ -383,27 +360,14 @@ server:
     configs: |-
       pinot.set.instance.id.to.hostname=true
       pinot.server.instance.realtime.alloc.offheap=true
-      #pinot.server.adminapi.access.protocols=https
-      #pinot.server.adminapi.access.protocols.https.port=7443
-      #pinot.server.netty.enabled=false
-      #pinot.server.nettytls.enabled=true
-      #pinot.server.nettytls.port=8089
-      pinot.server.segment.fetcher.auth.token=Basic YWRtaW46dmVyeXNlY3JldA==
-      pinot.server.segment.uploader.auth.token=Basic YWRtaW46dmVyeXNlY3JldA==
-      pinot.server.instance.auth.token=Basic YWRtaW46dmVyeXNlY3JldA==
-      pinot.server.instance.enable.split.commit=true
-      pinot.server.storage.factory.class.s3=org.apache.pinot.plugin.filesystem.S3PinotFS
-      pinot.server.storage.factory.s3.region=ap-south-1
-      pinot.server.segment.fetcher.protocols=file,http,s3
-      pinot.server.segment.fetcher.s3.class=org.apache.pinot.common.utils.fetcher.PinotFSSegmentFetcher
 
 # ------------------------------------------------------------------------------
 # Pinot Minion:
 # ------------------------------------------------------------------------------
 minion:
-  enabled: true
+  enabled: false
   name: minion
-  replicaCount: 4
+  replicaCount: 0
   podManagementPolicy: Parallel
   podSecurityContext: {}
     # fsGroup: 2000
@@ -423,7 +387,7 @@ minion:
   persistence:
     enabled: true
     accessMode: ReadWriteOnce
-    size: 30G
+    size: 4G
     mountPath: /var/pinot/minion/data
     storageClass: ""
     #storageClass: "ssd"
@@ -444,7 +408,7 @@ minion:
 
   resources:
     requests:
-      memory: "4.25Gi"
+      memory: "1.25Gi"
 
   nodeSelector: {}
 
@@ -478,14 +442,7 @@ minion:
   extra:
     configs: |-
       pinot.set.instance.id.to.hostname=true
-      pinot.minion.segment.fetcher.auth.token=Basic YWRtaW46dmVyeXNlY3JldA==
-      segment.fetcher.auth.token=Basic YWRtaW46dmVyeXNlY3JldA==
-      authToken: Basic YWRtaW46dmVyeXNlY3JldA==
-      task.auth.token=Basic YWRtaW46dmVyeXNlY3JldA==
-      pinot.minion.storage.factory.class.s3=org.apache.pinot.plugin.filesystem.S3PinotFS
-      pinot.minion.storage.factory.s3.region=ap-south-1
-      pinot.minion.segment.fetcher.protocols=file,http,s3
-      pinot.minion.segment.fetcher.s3.class=org.apache.pinot.common.utils.fetcher.PinotFSSegmentFetcher
+
 
 # ------------------------------------------------------------------------------
 # Pinot Minion Stateless:

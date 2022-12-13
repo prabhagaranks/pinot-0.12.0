@@ -23,7 +23,6 @@ import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.calcite.sql.SqlKind;
-import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.Operator;
@@ -111,20 +110,21 @@ public class AggregateOperatorTest {
 
     DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, INT});
     Mockito.when(_input.nextBlock())
-        .thenReturn(block(inSchema, new Object[]{1, 1}))
-        .thenReturn(TransferableBlockUtils.getNoOpTransferableBlock());
+        .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{1, 1}))
+        .thenReturn(TransferableBlockUtils.getNoOpTransferableBlock())
+        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     DataSchema outSchema = new DataSchema(new String[]{"sum"}, new ColumnDataType[]{DOUBLE});
     AggregateOperator operator = new AggregateOperator(_input, outSchema, calls, group);
 
     // When:
-    TransferableBlock block1 = operator.nextBlock(); // build
-    TransferableBlock block2 = operator.nextBlock(); // get no-op
+    TransferableBlock block1 = operator.nextBlock(); // build when reading NoOp block
+    TransferableBlock block2 = operator.nextBlock(); // return when reading EOS block
 
     // Then:
-    Mockito.verify(_input, Mockito.times(2)).nextBlock();
-    Assert.assertTrue(block1.isNoOpBlock(), "First block should be no-op (not yet constructed)");
-    Assert.assertTrue(block2.isNoOpBlock(), "Second block should be no-op (done construct)");
+    Mockito.verify(_input, Mockito.times(3)).nextBlock();
+    Assert.assertTrue(block1.isNoOpBlock());
+    Assert.assertEquals(block2.getContainer().size(), 1);
   }
 
   @Test
@@ -135,7 +135,7 @@ public class AggregateOperatorTest {
 
     DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, INT});
     Mockito.when(_input.nextBlock())
-        .thenReturn(block(inSchema, new Object[]{2, 1}))
+        .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{2, 1}))
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     DataSchema outSchema = new DataSchema(new String[]{"sum"}, new ColumnDataType[]{DOUBLE});
@@ -144,15 +144,13 @@ public class AggregateOperatorTest {
     // When:
     TransferableBlock block1 = operator.nextBlock();
     TransferableBlock block2 = operator.nextBlock();
-    TransferableBlock block3 = operator.nextBlock();
 
     // Then:
     Mockito.verify(_input, Mockito.times(2)).nextBlock();
-    Assert.assertTrue(block1.isNoOpBlock(), "First block should be no-op (not yet constructed)");
-    Assert.assertTrue(block2.getNumRows() > 0, "Second block is the result");
-    Assert.assertEquals(block2.getContainer().get(0), new Object[]{2, 1},
+    Assert.assertTrue(block1.getNumRows() > 0, "First block is the result");
+    Assert.assertEquals(block1.getContainer().get(0), new Object[]{2, 1},
         "Expected two columns (group by key, agg value)");
-    Assert.assertTrue(block3.isEndOfStreamBlock(), "Third block is EOS (done processing)");
+    Assert.assertTrue(block2.isEndOfStreamBlock(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -163,7 +161,7 @@ public class AggregateOperatorTest {
 
     DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, INT});
     Mockito.when(_input.nextBlock())
-        .thenReturn(block(inSchema, new Object[]{2, 3}))
+        .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{2, 3}))
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     DataSchema outSchema = new DataSchema(new String[]{"sum"}, new ColumnDataType[]{DOUBLE});
@@ -172,16 +170,14 @@ public class AggregateOperatorTest {
     // When:
     TransferableBlock block1 = operator.nextBlock();
     TransferableBlock block2 = operator.nextBlock();
-    TransferableBlock block3 = operator.nextBlock();
 
     // Then:
     Mockito.verify(_input, Mockito.times(2)).nextBlock();
-    Assert.assertTrue(block1.isNoOpBlock(), "First block should be no-op (not yet constructed)");
-    Assert.assertTrue(block2.getNumRows() > 0, "Second block is the result");
+    Assert.assertTrue(block1.getNumRows() > 0, "First block is the result");
     // second value is 1 (the literal) instead of 3 (the col val)
-    Assert.assertEquals(block2.getContainer().get(0), new Object[]{2, 1},
+    Assert.assertEquals(block1.getContainer().get(0), new Object[]{2, 1},
         "Expected two columns (group by key, agg value)");
-    Assert.assertTrue(block3.isEndOfStreamBlock(), "Third block is EOS (done processing)");
+    Assert.assertTrue(block2.isEndOfStreamBlock(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -192,8 +188,8 @@ public class AggregateOperatorTest {
 
     DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, INT});
     Mockito.when(_input.nextBlock())
-        .thenReturn(block(inSchema, new Object[]{1, 1}, new Object[]{1, 1}))
-        .thenReturn(block(inSchema, new Object[]{1, 1}))
+        .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{1, 1}, new Object[]{1, 1}))
+        .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{1, 1}))
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     AggregateOperator.Merger merger = Mockito.mock(AggregateOperator.Merger.class);
@@ -204,8 +200,6 @@ public class AggregateOperatorTest {
     ));
 
     // When:
-    operator.nextBlock(); // first block consume
-    operator.nextBlock(); // second block consume (done build)
     TransferableBlock resultBlock = operator.nextBlock(); // (output result)
 
     // Then:
@@ -260,7 +254,7 @@ public class AggregateOperatorTest {
     Mockito.when(_input.nextBlock())
         // TODO: it is necessary to produce two values here, the operator only throws on second
         // (see the comment in Aggregate operator)
-        .thenReturn(block(inSchema, new Object[]{2, "foo"}, new Object[]{2, "foo"}))
+        .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{2, "foo"}, new Object[]{2, "foo"}))
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     DataSchema outSchema = new DataSchema(new String[]{"sum"}, new ColumnDataType[]{DOUBLE});
@@ -273,10 +267,6 @@ public class AggregateOperatorTest {
     Assert.assertTrue(block.isErrorBlock(), "expected ERROR block from invalid computation");
     Assert.assertTrue(block.getDataBlock().getExceptions().get(1000).contains("String cannot be cast to class"),
         "expected it to fail with class cast exception");
-  }
-
-  private static TransferableBlock block(DataSchema schema, Object[]... rows) {
-    return new TransferableBlock(Arrays.asList(rows), schema, DataBlock.Type.ROW);
   }
 
   private static RexExpression.FunctionCall getSum(RexExpression arg) {

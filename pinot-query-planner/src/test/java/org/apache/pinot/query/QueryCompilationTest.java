@@ -78,14 +78,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     }
   }
 
-  @Test
-  public void testQueryGroupByAfterJoinShouldNotDoDataShuffle()
-      throws Exception {
-    String query = "SELECT a.col1, a.col2, AVG(b.col3) FROM a JOIN b ON a.col1 = b.col2 "
-        + " WHERE a.col3 >= 0 AND a.col2 = 'a' AND b.col3 < 0 GROUP BY a.col1, a.col2";
-    QueryPlan queryPlan = _queryEnvironment.planQuery(query);
-    Assert.assertEquals(queryPlan.getQueryStageMap().size(), 5);
-    Assert.assertEquals(queryPlan.getStageMetadataMap().size(), 5);
+  private static void assertGroupBySingletonAfterJoin(QueryPlan queryPlan, boolean shouldRewrite) throws Exception {
     for (Map.Entry<Integer, StageMetadata> e : queryPlan.getStageMetadataMap().entrySet()) {
       if (e.getValue().getScannedTables().size() == 0 && !PlannerUtils.isRootStage(e.getKey())) {
         StageNode node = queryPlan.getQueryStageMap().get(e.getKey());
@@ -101,7 +94,11 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
           if (node instanceof AggregateNode && node.getInputs().get(0) instanceof MailboxReceiveNode) {
             // AGG is exchanged with singleton since it has already been distributed by JOIN.
             MailboxReceiveNode input = (MailboxReceiveNode) node.getInputs().get(0);
-            Assert.assertEquals(input.getExchangeType(), RelDistribution.Type.SINGLETON);
+            if (shouldRewrite) {
+              Assert.assertEquals(input.getExchangeType(), RelDistribution.Type.SINGLETON);
+            } else {
+              Assert.assertNotEquals(input.getExchangeType(), RelDistribution.Type.SINGLETON);
+            }
             break;
           }
           node = node.getInputs().get(0);

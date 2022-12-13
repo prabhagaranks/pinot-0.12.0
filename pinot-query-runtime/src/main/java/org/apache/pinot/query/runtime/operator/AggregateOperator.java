@@ -29,7 +29,6 @@ import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlock;
-import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.table.Key;
@@ -38,7 +37,6 @@ import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -165,28 +163,25 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
    */
   private boolean consumeInputBlocks() {
     TransferableBlock block = _inputOperator.nextBlock();
-    // setting upstream error block
-    if (block.isErrorBlock()) {
-      _upstreamErrorBlock = block;
-      return true;
-    } else if (block.isEndOfStreamBlock()) {
-      _readyToConstruct = true;
-      return true;
-    }
+    while (!block.isNoOpBlock()) {
+      // setting upstream error block
+      if (block.isErrorBlock()) {
+        _upstreamErrorBlock = block;
+        return true;
+      } else if (block.isEndOfStreamBlock()) {
+        _readyToConstruct = true;
+        return true;
+      }
 
-    DataBlock dataBlock = block.getDataBlock();
-    int numRows = dataBlock.getNumberOfRows();
-    if (numRows > 0) {
-      RoaringBitmap[] nullBitmaps = DataBlockUtils.extractNullBitmaps(dataBlock);
-      for (int rowId = 0; rowId < numRows; rowId++) {
-        Object[] row = DataBlockUtils.extractRowFromDataBlock(dataBlock, rowId,
-            dataBlock.getDataSchema().getColumnDataTypes(), nullBitmaps);
+      List<Object[]> container = block.getContainer();
+      for (Object[] row : container) {
         Key key = extraRowKey(row, _groupSet);
         _groupByKeyHolder.put(key, key.getValues());
         for (int i = 0; i < _aggCalls.size(); i++) {
           _accumulators[i].accumulate(key, row);
         }
       }
+      block = _inputOperator.nextBlock();
     }
     return false;
   }
@@ -206,6 +201,14 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
   private static Object mergeCount(Object left, Object ignored) {
     // TODO: COUNT(*) doesn't need to parse right object until we support NULL
     return ((Number) left).doubleValue() + 1;
+  }
+
+  private static Boolean mergeBoolAnd(Object left, Object right) {
+    return ((Boolean) left) && ((Boolean) right);
+  }
+
+  private static Boolean mergeBoolOr(Object left, Object right) {
+    return ((Boolean) left) || ((Boolean) right);
   }
 
   private static Key extraRowKey(Object[] row, List<RexExpression> groupSet) {
@@ -233,6 +236,12 @@ public class AggregateOperator extends BaseOperator<TransferableBlock> {
         .put("$MAX", AggregateOperator::mergeMax)
         .put("$MAX0", AggregateOperator::mergeMax)
         .put("COUNT", AggregateOperator::mergeCount)
+        .put("BOOL_AND", AggregateOperator::mergeBoolAnd)
+        .put("$BOOL_AND", AggregateOperator::mergeBoolAnd)
+        .put("$BOOL_AND0", AggregateOperator::mergeBoolAnd)
+        .put("BOOL_OR", AggregateOperator::mergeBoolOr)
+        .put("$BOOL_OR", AggregateOperator::mergeBoolOr)
+        .put("$BOOL_OR0", AggregateOperator::mergeBoolOr)
         .build();
 
     final int _inputRef;

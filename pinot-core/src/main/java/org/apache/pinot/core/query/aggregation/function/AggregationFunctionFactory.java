@@ -273,6 +273,18 @@ public class AggregationFunctionFactory {
             return new CovarianceAggregationFunction(arguments, false);
           case COVARSAMP:
             return new CovarianceAggregationFunction(arguments, true);
+          case BOOLAND:
+            return new BooleanAndAggregationFunction(firstArgument, queryContext.isNullHandlingEnabled());
+          case BOOLOR:
+            return new BooleanOrAggregationFunction(firstArgument, queryContext.isNullHandlingEnabled());
+          case VARPOP:
+            return new VarianceAggregationFunction(firstArgument, false, false);
+          case VARSAMP:
+            return new VarianceAggregationFunction(firstArgument, true, false);
+          case STDDEVPOP:
+            return new VarianceAggregationFunction(firstArgument, false, true);
+          case STDDEVSAMP:
+            return new VarianceAggregationFunction(firstArgument, true, true);
           default:
             throw new IllegalArgumentException();
         }

@@ -21,6 +21,7 @@ package org.apache.calcite.sql.fun;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.sql.SqlFunction;
 import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql.validate.SqlNameMatchers;
@@ -39,11 +40,14 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
  *   <li>Still maintain minimum customization and benefit from Calcite's original operator table setting.</li>
  * </ul>
  */
+@SuppressWarnings("unused") // unused fields are accessed by reflection
 public class PinotOperatorTable extends SqlStdOperatorTable {
 
   private static @MonotonicNonNull PinotOperatorTable _instance;
 
   public static final SqlFunction COALESCE = new PinotSqlCoalesceFunction();
+  public static final SqlAggFunction BOOL_AND = new PinotBoolAndAggregateFunction();
+  public static final SqlAggFunction BOOL_OR = new PinotBoolOrAggregateFunction();
 
   // TODO: clean up lazy init by using Suppliers.memorized(this::computeInstance) and make getter wrapped around
   // supplier instance. this should replace all lazy init static objects in the codebase

@@ -97,6 +97,8 @@ import {
 } from '../requests';
 import { baseApi } from './axios-config';
 import Utils, { getDisplaySegmentStatus } from './Utils';
+import { matchPath } from 'react-router';
+import RouterData from '../router';
 const JSONbig = require('json-bigint')({'storeAsString': true})
 
 // This method is used to display tenants listing on cluster manager home page
@@ -352,13 +354,28 @@ const getSchemaObject = async (schemaName) =>{
       return schemaObj;
   }
 
+// This method is used to display schema listing on the tables listing page
+// API: /schemas
+// Expected Output: {columns: [], records: []}
+const getListingSchemaList = () => {
+  return getSchemaList().then((results) => {
+    const responseObj = {
+      columns: ['Schemas'],
+      records: []
+    };
+    results.data.forEach((result)=>{
+      responseObj.records.push([result]);
+    });
+    return responseObj;
+  })
+};
+
 const allSchemaDetailsColumnHeader = ["Schema Name", "Dimension Columns", "Date-Time Columns", "Metrics Columns", "Total Columns"];
 
-const getAllSchemaDetails = async () => {
+const getAllSchemaDetails = async (schemaList) => {
   let schemaDetails:Array<any> = [];
   let promiseArr = [];
-  const {data} = await getSchemaList()
-  promiseArr = data.map(async (o)=>{
+  promiseArr = schemaList.map(async (o)=>{
     return await getSchema(o);
   });
   const results = await Promise.all(promiseArr);
@@ -894,8 +911,8 @@ const updateTable = (tableName: string, table: string) => {
   })
 };
 
-const updateSchema = (schemaName: string, schema: string) => {
-  return putSchema(schemaName, schema).then((res)=>{
+const updateSchema = (schemaName: string, schema: string, reload?: boolean) => {
+  return putSchema(schemaName, schema, reload).then((res)=>{
     return res.data;
   })
 };
@@ -991,6 +1008,37 @@ const getAccessTokenFromHashParams = () => {
   return accessToken;
 };
 
+
+// validates app redirect path with known routes
+const validateRedirectPath = (path: string): boolean => {
+  if(!path) {
+    return false;
+  }
+
+  if(!path.startsWith("/")) {
+    path = "/" + path;
+  }
+
+  let pathName = "";
+
+  try {
+    const appUrl = new URL(location.origin + path);
+    pathName = appUrl.pathname;
+  } catch(err) {
+    console.error(err);
+    return false;
+  }
+
+  const knownAppRoutes = RouterData.map((data) => data.path);
+  const routeMatches = matchPath(pathName, {path: knownAppRoutes, exact: true});
+  
+  if(!routeMatches) {
+    return false;
+  }
+
+  return true;
+};
+
 const getURLWithoutAccessToken = (fallbackUrl = '/'): string => {
   let prefix = '';
   let url = location.hash.substring(1);
@@ -1022,6 +1070,12 @@ const getURLWithoutAccessToken = (fallbackUrl = '/'): string => {
     }
     
     url = urlParams.join('&');
+
+    if(!validateRedirectPath(url)) {
+      // constructed redirect url is not a valid app route
+      // redirect to fallBackUrl
+      url = fallbackUrl;
+    }
   } else {
     url = fallbackUrl;
   }
@@ -1157,6 +1211,7 @@ export default {
   saveSchemaAction,
   saveTableAction,
   getSchemaData,
+  getQuerySchemaList: getListingSchemaList,
   allSchemaDetailsColumnHeader,
   getAllSchemaDetails,
   getTableState,
