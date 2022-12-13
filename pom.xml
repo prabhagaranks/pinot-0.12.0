@@ -49,6 +49,7 @@
     <module>pinot-minion</module>
     <module>pinot-plugins</module>
     <module>pinot-tools</module>
+    <module>pinot-integration-test-base</module>
     <module>pinot-distribution</module>
     <module>pinot-connectors</module>
     <module>pinot-segment-local</module>
