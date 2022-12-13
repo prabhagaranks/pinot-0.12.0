@@ -39,6 +39,7 @@ import org.apache.pinot.core.segment.processing.timehandler.TimeHandlerFactory;
 import org.apache.pinot.core.segment.processing.utils.SegmentProcessorUtils;
 import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -81,7 +82,8 @@ public class SegmentMapper {
     _mapperOutputDir = mapperOutputDir;
 
     TableConfig tableConfig = processorConfig.getTableConfig();
-    Schema schema = processorConfig.getSchema();
+    Schema schema = SegmentGeneratorConfig.updateSchemaWithTimestampIndexes(processorConfig.getSchema(),
+        SegmentGeneratorConfig.extractTimestampIndexConfigsFromTableConfig(tableConfig));
     Pair<List<FieldSpec>, Integer> pair = SegmentProcessorUtils.getFieldSpecs(schema, processorConfig.getMergeType(),
         tableConfig.getIndexingConfig().getSortedColumn());
     _fieldSpecs = pair.getLeft();
