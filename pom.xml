@@ -51,7 +51,6 @@
     <module>pinot-tools</module>
     <module>pinot-perf</module>
     <module>pinot-integration-test-base</module>
-    <module>pinot-integration-tests</module>
     <module>pinot-distribution</module>
     <module>pinot-connectors</module>
     <module>pinot-segment-local</module>
