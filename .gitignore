@@ -44,7 +44,6 @@ yarn-error.log*
 quickstart*
 
 #build symlink directory
-build*
 
 #helm related files
 kubernetes/helm/**/charts/
